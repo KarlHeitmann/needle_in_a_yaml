@@ -1,2 +1,4 @@
 en.yml
+*.yml
+en.yml.bak
 /target
