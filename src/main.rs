@@ -1,14 +1,3 @@
-/// A simple example demonstrating how to handle user input. This is
-/// a bit out of the scope of the library as it does not provide any
-/// input handling out of the box. However, it may helps some to get
-/// started.
-///
-/// This is a very simple example:
-///   * A input box always focused. Every character you type is registered
-///   here
-///   * Pressing Backspace erases a character
-///   * Pressing Enter pushes the current input in the history of previous
-///   messages
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -28,7 +17,7 @@ use unicode_width::UnicodeWidthStr;
 use serde_yaml; // 0.8.7
 use serde_yaml::Value;
 // use serde_yaml::Value::{Null, Bool, Number, String as YamlString, Sequence, Mapping, Tagged};
-use serde_yaml::Value::{Null, Bool, Number, String as YamlString, Sequence, Mapping, Tagged};
+use serde_yaml::Value::Mapping;
 
 enum InputMode {
     Normal,
@@ -52,8 +41,6 @@ impl Default for App {
             input: String::new(),
             input_mode: InputMode::Normal,
             messages: Vec::new(),
-            // messages: serde_yaml::Value::Sequence(Vec::new()),
-            // messages: vec![],
         }
     }
 }
@@ -93,17 +80,25 @@ fn unwrap_value(v: Value) -> String {
     }
 }
 
-fn filter_yaml(v: &Value, s: &String) -> Option<Value> {
-    match v {
-        Mapping(m) => {
-            let found_val = m.iter().find(|k| {
-                let my_s = k.0.as_str().unwrap();
-                my_s == s
-            } ).unwrap().1;
-            Some(found_val.clone())
-        },
-        _ => None
+fn filter_yaml(v: &Value, ss: &Vec<String>) -> String {
+    let mut founded;
+    let mut curr_v = v.clone();
+    for s in ss {
+        founded = match curr_v {
+            Mapping(ref m) => {
+                let found_val = m.iter().find(|k| {
+                    let my_s = k.0.as_str().unwrap();
+                    my_s == s
+                } ); //.unwrap().1;
+                if found_val.is_none() { return String::from("Uh oh, key not found") }
+                Some(found_val.unwrap().1.clone())
+            },
+            _ => None
+        };
+        if founded.is_none() { return String::from("Uh Oh, key not found"); }
+        curr_v = founded.unwrap();
     }
+    unwrap_value(curr_v)
     /*
     match Value {
         Null =>,
@@ -144,9 +139,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                     KeyCode::Enter => {
                         let m = app.input.drain(..).collect();
                         // app.input.dr
-                        filtered_d = filter_yaml(&d, &m).unwrap();
-                        my_string_representation = unwrap_value(filtered_d);
                         app.messages.push(m);
+                        my_string_representation = filter_yaml(&d, &app.messages);
+                    }
+                    KeyCode::Delete => {
+                        // app.input.push_str(&String::from("ASD"));
+                        app.messages.pop();
+                        my_string_representation = filter_yaml(&d, &app.messages);
                     }
                     KeyCode::Char(c) => {
                         app.input.push(c);
@@ -228,17 +227,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
         }
     }
 
-    /*
-    let messages: Vec<ListItem> = app
-        .messages
-        .iter()
-        .enumerate()
-        .map(|(i, m)| {
-            let content = vec![Spans::from(Span::raw(format!("{}: {}", i, m)))];
-            ListItem::new(content)
-        })
-        .collect();
-    */
     let messages: Vec<ListItem> = app
         .messages
         .iter()
@@ -250,8 +238,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
         .collect();
     let messages =
         List::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
-    // f.render_widget(messages, chunks[2]);
-    // let viewport = Paragraph::new(String::from("wena como va"));
     let viewport = Paragraph::new(my_string_representation);
 
     let nodes_chunks = Layout::default()
@@ -260,12 +246,9 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
             [Constraint::Percentage(50), Constraint::Percentage(50)].as_ref(),
         )
         .split(chunks[2]);
-    // let (left, right) = render_nodes(&node_list_state, &explorer, &app);
-    // rect.render_stateful_widget(left, nodes_chunks[0], &mut node_list_state);
     f.render_widget(viewport, nodes_chunks[0]);
     f.render_widget(messages, nodes_chunks[1]);
 
-    // f.render_widget(viewport, chunks[2]);
 }
 
 
