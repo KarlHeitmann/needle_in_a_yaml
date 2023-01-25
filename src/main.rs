@@ -41,6 +41,7 @@ struct App {
     input_mode: InputMode,
     /// History of recorded messages
     messages: Vec<String>,
+    // messages: Value,
 }
 
 impl Default for App {
@@ -49,19 +50,13 @@ impl Default for App {
             input: String::new(),
             input_mode: InputMode::Normal,
             messages: Vec::new(),
+            // messages: serde_yaml::Value::Sequence(Vec::new()),
+            // messages: vec![],
         }
     }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // let f = std::fs::File::open("en.yml")?;
-    let f = std::fs::File::open("sample.yml")?;
-    // let d: String = serde_yaml::from_reader(f)?;
-    let d: Value = serde_yaml::from_reader(f)?;
-    // println!("Read YAML string: {}", d);
-
-    println!("Read YAML string: {:?}", d);
-
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -89,10 +84,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn unwrap_value(v: Value) -> String {
+    match serde_yaml::to_string(&v) {
+        Ok(s) => s,
+        Err(m) => format!("An exception occured: {}", m)
+    }
+}
+
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), Box<dyn std::error::Error>> {
 
+    let f = std::fs::File::open("sample.yml")?;
+    let d: Value = serde_yaml::from_reader(f)?;
+
+    let my_string_representation = unwrap_value(d);
+
     loop {
-        terminal.draw(|f| ui(f, &app))?;
+        terminal.draw(|f| ui(f, &app, &my_string_representation))?;
 
         if let Event::Key(key) = event::read()? {
             match app.input_mode {
@@ -107,7 +114,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                 },
                 InputMode::Editing => match key.code {
                     KeyCode::Enter => {
-                        app.messages.push(app.input.drain(..).collect());
+                        // app.messages.push(app.input.drain(..).collect());
                     }
                     KeyCode::Char(c) => {
                         app.input.push(c);
@@ -125,7 +132,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -189,6 +196,17 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         }
     }
 
+    /*
+    let messages: Vec<ListItem> = app
+        .messages
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let content = vec![Spans::from(Span::raw(format!("{}: {}", i, m)))];
+            ListItem::new(content)
+        })
+        .collect();
+    */
     let messages: Vec<ListItem> = app
         .messages
         .iter()
@@ -200,7 +218,10 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         .collect();
     let messages =
         List::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
-    f.render_widget(messages, chunks[2]);
+    // f.render_widget(messages, chunks[2]);
+    // let viewport = Paragraph::new(String::from("wena como va"));
+    let viewport = Paragraph::new(my_string_representation);
+    f.render_widget(viewport, chunks[2]);
 }
 
 
