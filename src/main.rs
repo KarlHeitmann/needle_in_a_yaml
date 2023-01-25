@@ -27,6 +27,8 @@ use unicode_width::UnicodeWidthStr;
 
 use serde_yaml; // 0.8.7
 use serde_yaml::Value;
+// use serde_yaml::Value::{Null, Bool, Number, String as YamlString, Sequence, Mapping, Tagged};
+use serde_yaml::Value::{Null, Bool, Number, String as YamlString, Sequence, Mapping, Tagged};
 
 enum InputMode {
     Normal,
@@ -91,12 +93,38 @@ fn unwrap_value(v: Value) -> String {
     }
 }
 
+fn filter_yaml(v: &Value, s: &String) -> Option<Value> {
+    match v {
+        Mapping(m) => {
+            let found_val = m.iter().find(|k| {
+                let my_s = k.0.as_str().unwrap();
+                my_s == s
+            } ).unwrap().1;
+            Some(found_val.clone())
+        },
+        _ => None
+    }
+    /*
+    match Value {
+        Null =>,
+        Bool(bool),
+        Number(Number),
+        String(String),
+        Sequence(Sequence),
+        Mapping(Mapping),
+        Tagged(Box<TaggedValue>),
+    }
+    */
+}
+
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), Box<dyn std::error::Error>> {
 
     let f = std::fs::File::open("sample.yml")?;
     let d: Value = serde_yaml::from_reader(f)?;
+    let mut filtered_d: Value = d.clone();
 
-    let my_string_representation = unwrap_value(d);
+    let mut my_string_representation = unwrap_value(filtered_d);
+    // let mut filtered_string_representation = my_string_representation.clone();
 
     loop {
         terminal.draw(|f| ui(f, &app, &my_string_representation))?;
@@ -114,7 +142,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
                 },
                 InputMode::Editing => match key.code {
                     KeyCode::Enter => {
-                        // app.messages.push(app.input.drain(..).collect());
+                        let m = app.input.drain(..).collect();
+                        // app.input.dr
+                        filtered_d = filter_yaml(&d, &m).unwrap();
+                        my_string_representation = unwrap_value(filtered_d);
+                        app.messages.push(m);
                     }
                     KeyCode::Char(c) => {
                         app.input.push(c);
@@ -221,7 +253,19 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
     // f.render_widget(messages, chunks[2]);
     // let viewport = Paragraph::new(String::from("wena como va"));
     let viewport = Paragraph::new(my_string_representation);
-    f.render_widget(viewport, chunks[2]);
+
+    let nodes_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [Constraint::Percentage(50), Constraint::Percentage(50)].as_ref(),
+        )
+        .split(chunks[2]);
+    // let (left, right) = render_nodes(&node_list_state, &explorer, &app);
+    // rect.render_stateful_widget(left, nodes_chunks[0], &mut node_list_state);
+    f.render_widget(viewport, nodes_chunks[0]);
+    f.render_widget(messages, nodes_chunks[1]);
+
+    // f.render_widget(viewport, chunks[2]);
 }
 
 
