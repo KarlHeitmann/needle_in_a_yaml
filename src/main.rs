@@ -172,6 +172,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
                 Constraint::Length(1),
                 Constraint::Length(3),
                 Constraint::Min(1),
+                Constraint::Length(3),
             ]
             .as_ref(),
         )
@@ -192,6 +193,8 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
             vec![
                 Span::raw("Press "),
                 Span::styled("Esc", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" or "),
+                Span::styled("F2", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to stop editing, "),
                 Span::styled("Enter", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to record the message"),
@@ -248,6 +251,16 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
         .split(chunks[2]);
     f.render_widget(viewport, nodes_chunks[0]);
     f.render_widget(messages, nodes_chunks[1]);
+    let mut breadcrumbs = app.messages.join(" - ");
+    let ruby_code = format!("\nI18n.t(\"{}\")", app.messages.join("."));
+    // let status_bar = Paragraph::new(app.messages.join(" - "));
+    // let status_bar = Paragraph::new(app.messages.iter().fold(String::new(), |acc, m| format!("{acc} - {m}")));
+    breadcrumbs.push_str(&ruby_code);
+
+    // let status_bar = Paragraph::new(breadcrumbs.push_str(&ruby_code));
+    let status_bar = Paragraph::new(breadcrumbs);
+
+    f.render_widget(status_bar, chunks[3]);
 
 }
 
