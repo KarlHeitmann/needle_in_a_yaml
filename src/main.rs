@@ -17,7 +17,7 @@ use unicode_width::UnicodeWidthStr;
 use serde_yaml; // 0.8.7
 use serde_yaml::Value;
 // use serde_yaml::Value::{Null, Bool, Number, String as YamlString, Sequence, Mapping, Tagged};
-use serde_yaml::Value::Mapping;
+use serde_yaml::Value::{Mapping, String as YamlString};
 
 use clap::Parser;
 
@@ -84,14 +84,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn unwrap_value(v: Value) -> String {
+fn unwrap_value(v: &Value) -> String {
     match serde_yaml::to_string(&v) {
         Ok(s) => s,
         Err(m) => format!("An exception occured: {}", m)
     }
 }
 
-fn filter_yaml(v: &Value, ss: &Vec<String>) -> String {
+fn filter_yaml(v: &Value, ss: &Vec<String>) -> Result<Value, String> {
     let mut founded;
     let mut curr_v = v.clone();
     for s in ss {
@@ -101,15 +101,14 @@ fn filter_yaml(v: &Value, ss: &Vec<String>) -> String {
                     let my_s = k.0.as_str().unwrap();
                     my_s == s
                 } ); //.unwrap().1;
-                if found_val.is_none() { return String::from("Uh oh, key not found") }
+                if found_val.is_none() { return Err(String::from("Uh oh, key not found")) }
                 Some(found_val.unwrap().1.clone())
             },
             _ => None
         };
-        if founded.is_none() { return String::from("Uh Oh, key not found"); }
+        if founded.is_none() { return Err(String::from("Uh Oh, key not found")); }
         curr_v = founded.unwrap();
     }
-    unwrap_value(curr_v)
     /*
     match Value {
         Null =>,
@@ -121,6 +120,16 @@ fn filter_yaml(v: &Value, ss: &Vec<String>) -> String {
         Tagged(Box<TaggedValue>),
     }
     */
+    Ok(curr_v)
+}
+
+fn get_keys(tree: &Value) -> Vec<String> { // TARGET
+    match tree {
+        Mapping(m) => {
+            m.iter().map(|k| String::from(k.0.as_str().unwrap())).collect()
+        },
+        _ => vec![]
+    }
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App, file: String) -> Result<(), Box<dyn std::error::Error>> {
@@ -129,12 +138,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App, file: String) -
     let d: Value = serde_yaml::from_reader(f)?;
     // let filtered_d: Value = d.clone();
 
-    // let mut my_string_representation = unwrap_value(filtered_d);
-    let mut my_string_representation = unwrap_value(d.clone());
+    let mut current_tree: Result<Value, String> = Ok(d.clone());
     // let mut filtered_string_representation = my_string_representation.clone();
 
     loop {
-        terminal.draw(|f| ui(f, &app, &my_string_representation))?;
+        terminal.draw(|f| ui(f, &app, &current_tree))?;
 
         if let Event::Key(key) = event::read()? {
             match app.input_mode {
@@ -152,12 +160,12 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App, file: String) -
                         let m = app.input.drain(..).collect();
                         // app.input.dr
                         app.messages.push(m);
-                        my_string_representation = filter_yaml(&d, &app.messages);
+                        current_tree = filter_yaml(&d, &app.messages);
                     }
                     KeyCode::Delete => {
                         // app.input.push_str(&String::from("ASD"));
                         app.messages.pop();
-                        my_string_representation = filter_yaml(&d, &app.messages);
+                        current_tree = filter_yaml(&d, &app.messages);
                     }
                     KeyCode::Char(c) => {
                         app.input.push(c);
@@ -175,7 +183,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App, file: String) -
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
+fn ui<B: Backend>(f: &mut Frame<B>, app: &App, current_tree: &Result<Value, String>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -242,8 +250,14 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
         }
     }
 
-    let messages: Vec<ListItem> = app
-        .messages
+    // let messages: Vec<ListItem> = app
+    // let messages: Vec<ListItem> = get_keys(app.messages).into()
+    let current_values = match current_tree {
+        Ok(t) => get_keys(t),
+        // Err(s) => YamlString(String::from(s))
+        Err(s) => vec![String::from(s)]
+    };
+    let messages: Vec<ListItem> = current_values
         .iter()
         .enumerate()
         .map(|(i, m)| {
@@ -252,8 +266,13 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, my_string_representation: &str) {
         })
         .collect();
     let messages =
-        List::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
-    let viewport = Paragraph::new(my_string_representation);
+        List::new(messages).block(Block::default().borders(Borders::ALL).title("Keys at current level"));
+    let my_string_representation = match current_tree {
+        Ok(v) => unwrap_value(v),
+        Err(s) => s.to_string(),
+    };
+
+    let viewport = Paragraph::new(my_string_representation); // TARGET
 
     let nodes_chunks = Layout::default()
         .direction(Direction::Horizontal)
