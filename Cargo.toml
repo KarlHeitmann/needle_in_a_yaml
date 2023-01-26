@@ -15,4 +15,5 @@ rand = { version = "0.7.3", default-features = false, features = ["std"] }
 tui = { version = "0.14", default-features = false, features = ['crossterm', 'serde'] }
 unicode-width = "0.1"
 
+clap = { version = "4.0.32", features = ["derive"] }
 

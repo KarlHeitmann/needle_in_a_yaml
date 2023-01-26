@@ -19,6 +19,8 @@ use serde_yaml::Value;
 // use serde_yaml::Value::{Null, Bool, Number, String as YamlString, Sequence, Mapping, Tagged};
 use serde_yaml::Value::Mapping;
 
+use clap::Parser;
+
 enum InputMode {
     Normal,
     Editing,
@@ -45,7 +47,16 @@ impl Default for App {
     }
 }
 
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    file_path: String,
+    // folder: Option<String>,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
+    let cli = Cli::parse();
+
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -55,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // create app and run it
     let app = App::default();
-    let res = run_app(&mut terminal, app);
+    let res = run_app(&mut terminal, app, cli.file_path);
 
     // restore terminal
     disable_raw_mode()?;
@@ -112,13 +123,14 @@ fn filter_yaml(v: &Value, ss: &Vec<String>) -> String {
     */
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), Box<dyn std::error::Error>> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App, file: String) -> Result<(), Box<dyn std::error::Error>> {
 
-    let f = std::fs::File::open("sample.yml")?;
+    let f = std::fs::File::open(file)?;
     let d: Value = serde_yaml::from_reader(f)?;
-    let mut filtered_d: Value = d.clone();
+    // let filtered_d: Value = d.clone();
 
-    let mut my_string_representation = unwrap_value(filtered_d);
+    // let mut my_string_representation = unwrap_value(filtered_d);
+    let mut my_string_representation = unwrap_value(d.clone());
     // let mut filtered_string_representation = my_string_representation.clone();
 
     loop {
